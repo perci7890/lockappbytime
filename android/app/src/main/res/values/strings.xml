@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">App Locker</string>
+    <string name="accessibility_service_description">Required to detect foreground applications and enforce scheduled time-based locking.</string>
+</resources>
