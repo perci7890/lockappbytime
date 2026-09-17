@@ -120,7 +120,7 @@ class LockScreenActivity : ComponentActivity() {
             // No security PIN configured yet
             AlertDialog.Builder(this)
                 .setTitle("Unlock $appName")
-                .setMessage("No Security PIN is configured in App Locker.\n\nDo you want to cancel the remaining lock time and unlock $appName?")
+                .setMessage("No Security PIN is configured in FocusLock.\n\nDo you want to cancel the remaining lock time and unlock $appName?")
                 .setPositiveButton("Unlock App") { _, _ ->
                     performUnlock()
                 }

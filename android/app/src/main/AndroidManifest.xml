@@ -14,7 +14,7 @@
         tools:ignore="ProtectedPermissions" />
 
     <application
-        android:label="App Locker"
+        android:label="FocusLock"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher">
 

@@ -85,7 +85,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
 
         return Scaffold(
           appBar: AppBar(
-            title: const Text('App Locker'),
+            title: const Text('FocusLock'),
             actions: [
               IconButton(
                 tooltip: 'Usage Statistics',
@@ -162,7 +162,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                         ),
                         const SizedBox(height: 6),
                         const Text(
-                          'Android may kill App Locker in the background, causing accessibility to turn off. Set battery usage to "Unrestricted" for 100% strict enforcement.',
+                          'Android may kill FocusLock in the background, causing accessibility to turn off. Set battery usage to "Unrestricted" for 100% strict enforcement.',
                           style: TextStyle(color: Colors.white70, fontSize: 13, height: 1.4),
                         ),
                         const SizedBox(height: 12),

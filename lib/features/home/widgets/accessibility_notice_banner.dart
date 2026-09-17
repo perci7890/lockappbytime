@@ -89,7 +89,7 @@ class AccessibilityNoticeBanner extends StatelessWidget {
               ),
               SizedBox(height: 8),
               Text(
-                'App Locker requires the Accessibility Service strictly to detect when you launch a locked application and immediately display the lock screen.',
+                'FocusLock requires the Accessibility Service strictly to detect when you launch a locked application and immediately display the lock screen.',
                 style: TextStyle(color: Colors.white70, fontSize: 13, height: 1.4),
               ),
               SizedBox(height: 12),

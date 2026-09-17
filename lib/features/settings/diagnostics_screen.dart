@@ -215,7 +215,7 @@ class _DiagnosticsScreenState extends State<DiagnosticsScreen> {
                 const SizedBox(height: 24),
 
                 const Text(
-                  'App Locker Status',
+                  'FocusLock Status',
                   style: TextStyle(
                     fontSize: 16,
                     fontWeight: FontWeight.bold,

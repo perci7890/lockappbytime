@@ -61,10 +61,10 @@ class AppLockForegroundService : Service() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             val channel = NotificationChannel(
                 CHANNEL_ID,
-                "App Lock Protection",
+                "FocusLock Protection",
                 NotificationManager.IMPORTANCE_LOW
             ).apply {
-                description = "Keeps App Locker running continuously to enforce app restrictions"
+                description = "Keeps FocusLock running continuously to enforce app restrictions"
                 setShowBadge(false)
             }
             val manager = getSystemService(NotificationManager::class.java)
@@ -89,7 +89,7 @@ class AppLockForegroundService : Service() {
         }
 
         val notification = builder
-            .setContentTitle("App Locker Active")
+            .setContentTitle("FocusLock Active")
             .setContentText("App restrictions are strictly enforced")
             .setSmallIcon(R.mipmap.ic_launcher)
             .setContentIntent(pendingIntent)

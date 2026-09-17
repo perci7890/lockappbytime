@@ -45,7 +45,7 @@ class AppLockAccessibilityService : AccessibilityService() {
                 val packageNameCharSequence = event.packageName ?: return
                 val currentPackage = packageNameCharSequence.toString()
 
-                // Never intercept or block App Locker itself
+                // Never intercept or block FocusLock itself
                 if (currentPackage == packageName) {
                     lastBlockedPackage = null
                     return

@@ -1,6 +1,6 @@
-# App Locker by Time (Android & Flutter)
+# FocusLock (Android & Flutter)
 
-A production-quality Android-first Flutter application that allows users to temporarily lock apps for user-defined durations (**1 minute to 24 hours**), schedule **recurring daily and weekday locks**, activate **overnight restrictions**, initiate **Focus Modes / App Groups**, view device **Usage Statistics**, and protect unlock operations with **Secure PIN Verification** and **5-minute emergency unlocks**.
+A production-quality Android-first Flutter application that allows users to strictly lock apps for user-defined durations (**1 minute to 24 hours**), schedule **recurring daily and weekday locks**, activate **overnight restrictions**, initiate **Focus Modes / App Groups**, view device **Usage Statistics**, and protect unlock operations with **Secure PIN Verification**.
 
 ---
 

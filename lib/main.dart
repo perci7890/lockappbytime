@@ -6,18 +6,18 @@ import 'features/home/providers/lock_provider.dart';
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
-  runApp(const AppLockerApp());
+  runApp(const FocusLockApp());
 }
 
-class AppLockerApp extends StatelessWidget {
-  const AppLockerApp({super.key});
+class FocusLockApp extends StatelessWidget {
+  const FocusLockApp({super.key});
 
   @override
   Widget build(BuildContext context) {
     return ChangeNotifierProvider(
       create: (_) => LockProvider(),
       child: MaterialApp(
-        title: 'App Locker',
+        title: 'FocusLock',
         debugShowCheckedModeBanner: false,
         theme: AppTheme.darkTheme,
         home: const HomeScreen(),
