@@ -12,6 +12,7 @@ class BootReceiver : BroadcastReceiver() {
             Log.d("BootReceiver", "Device reboot completed. Re-anchoring persistent locks...")
             try {
                 LockStorage.onDeviceReboot(context)
+                AppLockForegroundService.start(context)
             } catch (e: Exception) {
                 Log.e("BootReceiver", "Error during reboot initialization: ${e.message}")
             }

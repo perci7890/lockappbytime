@@ -30,12 +30,7 @@ data class LockInfo(
         if (!enabled) return false
 
         if (lockType == "temporary" || lockType == "focusMode") {
-            if (nowWall >= unlockAt) return false
-            if (elapsedRealtimeDeadline > 0L) {
-                val nowElapsed = SystemClock.elapsedRealtime()
-                if (nowElapsed >= elapsedRealtimeDeadline) return false
-            }
-            return true
+            return nowWall < unlockAt
         }
 
         if (lockType == "schedule") {
@@ -127,7 +122,6 @@ object LockStorage {
     private const val TAG = "LockStorage"
     private const val PREFS_NAME = "app_lock_prefs"
     private const val KEY_LOCKS = "active_locks_json"
-    private const val KEY_EMERGENCY_PREFIX = "emergency_until_"
 
     // Diagnostics / telemetry tracking
     var lastForegroundPackage: String = "None"
@@ -160,18 +154,76 @@ object LockStorage {
         return context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
     }
 
+    private const val KEY_PIN_HASH = "security_pin_hash"
+    private const val KEY_PIN_ENABLED = "security_pin_enabled"
+
     @Synchronized
-    fun setEmergencyUnlock(context: Context, packageName: String, durationMillis: Long = 5 * 60 * 1000L) {
-        val until = System.currentTimeMillis() + durationMillis
-        getPrefs(context).edit().putLong(KEY_EMERGENCY_PREFIX + packageName, until).apply()
-        Log.i(TAG, "Emergency unlock set for $packageName until $until")
+    fun savePinConfig(context: Context, hash: String, isEnabled: Boolean) {
+        getPrefs(context).edit()
+            .putString(KEY_PIN_HASH, hash)
+            .putBoolean(KEY_PIN_ENABLED, isEnabled)
+            .apply()
+        Log.i(TAG, "PIN configuration saved natively. isEnabled=$isEnabled")
     }
 
     @Synchronized
-    fun isEmergencyUnlocked(context: Context, packageName: String): Boolean {
-        val until = getPrefs(context).getLong(KEY_EMERGENCY_PREFIX + packageName, 0L)
-        val now = System.currentTimeMillis()
-        return now < until
+    fun isPinEnabled(context: Context): Boolean {
+        val prefs = getPrefs(context)
+        if (prefs.contains(KEY_PIN_ENABLED)) {
+            return prefs.getBoolean(KEY_PIN_ENABLED, false)
+        }
+        // Fallback to FlutterSharedPreferences
+        val flutterPrefs = context.getSharedPreferences("FlutterSharedPreferences", Context.MODE_PRIVATE)
+        return flutterPrefs.getBoolean("flutter.security_pin_enabled", false)
+    }
+
+    @Synchronized
+    fun getPinHash(context: Context): String? {
+        val prefs = getPrefs(context)
+        val hash = prefs.getString(KEY_PIN_HASH, null)
+        if (!hash.isNullOrEmpty()) return hash
+        val flutterPrefs = context.getSharedPreferences("FlutterSharedPreferences", Context.MODE_PRIVATE)
+        return flutterPrefs.getString("flutter.security_pin_hash", null)
+    }
+
+    fun verifyPinNative(context: Context, enteredPin: String): Boolean {
+        val storedHash = getPinHash(context) ?: return false
+        try {
+            if (storedHash.startsWith("pbkdf2$")) {
+                val parts = storedHash.split("$")
+                if (parts.size == 4) {
+                    val iterations = parts[1].toInt()
+                    val saltBytes = android.util.Base64.decode(parts[2], android.util.Base64.DEFAULT)
+                    val expectedHex = parts[3]
+
+                    val spec = javax.crypto.spec.PBEKeySpec(enteredPin.toCharArray(), saltBytes, iterations, 256)
+                    val factory = javax.crypto.SecretKeyFactory.getInstance("PBKDF2WithHmacSHA256")
+                    val derived = factory.generateSecret(spec).encoded
+                    val computedHex = derived.joinToString("") { "%02x".format(it) }
+
+                    return constantTimeEquals(expectedHex, computedHex)
+                }
+            } else {
+                // Legacy fallback: SHA-256 with static salt "app_locker_secure_salt_v2"
+                val md = java.security.MessageDigest.getInstance("SHA-256")
+                val input = enteredPin + "app_locker_secure_salt_v2"
+                val digest = md.digest(input.toByteArray(Charsets.UTF_8))
+                val computedHex = digest.joinToString("") { "%02x".format(it) }
+                return constantTimeEquals(storedHash, computedHex)
+            }
+        } catch (e: Exception) {
+            recordError("verifyPinNative failed: ${e.message}")
+        }
+        return false
+    }
+
+    private fun constantTimeEquals(a: String, b: String): Boolean {
+        if (a.length != b.length) return false
+        var result = 0
+        for (i in a.indices) {
+            result = result or (a[i].code xor b[i].code)
+        }
+        return result == 0
     }
 
     @Synchronized
@@ -230,11 +282,6 @@ object LockStorage {
     @Synchronized
     fun isPackageLocked(context: Context, packageName: String): LockInfo? {
         lastEnforcementCheckTime = System.currentTimeMillis()
-
-        // 1. Emergency unlock overrides any locks for this package
-        if (isEmergencyUnlocked(context, packageName)) {
-            return null
-        }
 
         val all = getAllLocks(context)
         val nowWall = System.currentTimeMillis()

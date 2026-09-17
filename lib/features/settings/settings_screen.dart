@@ -18,7 +18,6 @@ class SettingsScreen extends StatefulWidget {
 class _SettingsScreenState extends State<SettingsScreen> {
   bool _canDrawOverlays = false;
   bool _isPinEnabled = false;
-  bool _isEmergencyPinReq = false;
 
   @override
   void initState() {
@@ -29,12 +28,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
   Future<void> _checkStatus() async {
     final granted = await NativeBridgeService.canDrawOverlays();
     final pinEnabled = await PinService.isPinEnabled();
-    final emergencyPin = await PinService.isEmergencyPinRequired();
     if (mounted) {
       setState(() {
         _canDrawOverlays = granted;
         _isPinEnabled = pinEnabled;
-        _isEmergencyPinReq = emergencyPin;
       });
     }
   }
@@ -89,6 +86,18 @@ class _SettingsScreenState extends State<SettingsScreen> {
                         await _checkStatus();
                       },
                     ),
+                    const Divider(color: Color(0xFF334155), height: 1),
+                    ListTile(
+                      title: const Text('Battery Optimization', style: TextStyle(fontWeight: FontWeight.bold)),
+                      subtitle: const Text('Unrestricted background activity prevents Android from killing lock service', style: TextStyle(fontSize: 12, color: Colors.white60)),
+                      trailing: provider.isBatteryOptimizationIgnored
+                          ? const Icon(Icons.check_circle, color: Color(0xFF10B981))
+                          : const Icon(Icons.warning, color: Color(0xFFF59E0B)),
+                      onTap: () async {
+                        await provider.requestIgnoreBatteryOptimization();
+                        await _checkStatus();
+                      },
+                    ),
                   ],
                 ),
               ),
@@ -117,7 +126,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     SwitchListTile(
                       title: const Text('PIN Protection', style: TextStyle(fontWeight: FontWeight.bold)),
                       subtitle: Text(
-                        _isPinEnabled ? 'Protects early unlock and schedule editing' : 'Set a 4-digit PIN to prevent bypass',
+                        _isPinEnabled ? 'PIN is strictly required to remove locks or change schedules' : 'Set a 4-digit PIN to prevent bypass until time expires',
                         style: const TextStyle(fontSize: 12, color: Colors.white60),
                       ),
                       value: _isPinEnabled,
@@ -143,19 +152,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
                         }
                       },
                     ),
-                    if (_isPinEnabled) ...[
-                      const Divider(color: Color(0xFF334155), height: 1),
-                      SwitchListTile(
-                        title: const Text('Require PIN for Emergency Unlock', style: TextStyle(fontWeight: FontWeight.bold)),
-                        subtitle: const Text('Prompt for PIN before 5-minute unlock', style: TextStyle(fontSize: 12, color: Colors.white60)),
-                        value: _isEmergencyPinReq,
-                        activeThumbColor: const Color(0xFF2563EB),
-                        onChanged: (val) async {
-                          await PinService.setEmergencyPinRequired(val);
-                          await _checkStatus();
-                        },
-                      ),
-                    ],
                   ],
                 ),
               ),

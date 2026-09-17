@@ -1,6 +1,8 @@
 import 'dart:async';
 import 'package:flutter/foundation.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:applockbytime/core/services/native_bridge_service.dart';
+import 'package:applockbytime/core/services/pin_service.dart';
 import 'package:applockbytime/data/models/app_info.dart';
 import 'package:applockbytime/data/models/lock_record.dart';
 import 'package:applockbytime/data/repositories/lock_repository.dart';
@@ -14,6 +16,7 @@ class LockProvider with ChangeNotifier {
   List<AppInfo> _installedApps = [];
   bool _isLoadingApps = false;
   bool _isAccessibilityEnabled = false;
+  bool _isBatteryOptimizationIgnored = true;
   Timer? _countdownTimer;
 
   List<LockRecord> get activeLocks => _activeLocks;
@@ -22,6 +25,7 @@ class LockProvider with ChangeNotifier {
   List<AppInfo> get installedApps => _installedApps;
   bool get isLoadingApps => _isLoadingApps;
   bool get isAccessibilityEnabled => _isAccessibilityEnabled;
+  bool get isBatteryOptimizationIgnored => _isBatteryOptimizationIgnored;
 
   LockProvider() {
     _startCountdownTicker();
@@ -44,9 +48,20 @@ class LockProvider with ChangeNotifier {
 
   Future<void> refreshAll() async {
     await checkAccessibilityPermission();
+    await checkBatteryOptimization();
+    await _syncPinToNative();
     await loadActiveLocks();
     await loadSchedules();
     await loadFocusModes();
+  }
+
+  Future<void> _syncPinToNative() async {
+    try {
+      final pinEnabled = await PinService.isPinEnabled();
+      final prefs = await SharedPreferences.getInstance();
+      final pinHash = prefs.getString('security_pin_hash') ?? '';
+      await NativeBridgeService.syncPinNative(pinHash, pinEnabled);
+    } catch (_) {}
   }
 
   Future<void> checkAccessibilityPermission() async {
@@ -55,11 +70,36 @@ class LockProvider with ChangeNotifier {
     notifyListeners();
   }
 
+  Future<void> checkBatteryOptimization() async {
+    _isBatteryOptimizationIgnored =
+        await NativeBridgeService.isBatteryOptimizationIgnored();
+    notifyListeners();
+  }
+
+  Future<void> requestIgnoreBatteryOptimization() async {
+    await NativeBridgeService.requestIgnoreBatteryOptimization();
+    await checkBatteryOptimization();
+  }
+
   Future<void> openAccessibilitySettings() async {
     await NativeBridgeService.openAccessibilitySettings();
   }
 
   Future<void> loadActiveLocks() async {
+    try {
+      // Reconcile with native locks: if a temporary lock was removed natively
+      // (e.g. via PIN unlock on native LockScreenActivity), prune it from SQLite.
+      final nativeLocks = await NativeBridgeService.getActiveLocksNative();
+      final nativePackages = nativeLocks.map((l) => l['packageName'] as String).toSet();
+
+      final dbLocks = await _repository.getActiveLocks();
+      for (final lock in dbLocks) {
+        if (lock.lockType != 'schedule' && !nativePackages.contains(lock.packageName)) {
+          await _repository.removeLock(lock.packageName, lockType: lock.lockType, sourceId: lock.sourceId);
+        }
+      }
+    } catch (_) {}
+
     _activeLocks = await _repository.getActiveLocks();
     notifyListeners();
   }
@@ -159,12 +199,6 @@ class LockProvider with ChangeNotifier {
 
   Future<void> unlockEarly(String packageName, {String? lockType, String? sourceId}) async {
     await _repository.removeLock(packageName, lockType: lockType, sourceId: sourceId);
-    await refreshAll();
-  }
-
-  /// 5-minute emergency unlock
-  Future<void> triggerEmergencyUnlock(String packageName) async {
-    await NativeBridgeService.setEmergencyUnlock(packageName);
     await refreshAll();
   }
 

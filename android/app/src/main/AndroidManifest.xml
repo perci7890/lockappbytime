@@ -1,9 +1,13 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
-    <!-- Permissions required for accessibility, reboot detection, package visibility, and notification/overlay if needed -->
+    <!-- Permissions required for accessibility, foreground service, reboot detection, package visibility, and battery optimization -->
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
     <uses-permission android:name="android.permission.QUERY_ALL_PACKAGES" />
     <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" />
     <uses-permission
         android:name="android.permission.PACKAGE_USAGE_STATS"
         xmlns:tools="http://schemas.android.com/tools"
@@ -42,6 +46,17 @@
             android:theme="@style/LockOverlayTheme"
             android:screenOrientation="portrait"
             android:configChanges="orientation|keyboardHidden|screenSize" />
+
+        <!-- Persistent Foreground Service to ensure process persistence and uninterrupted monitoring -->
+        <service
+            android:name=".AppLockForegroundService"
+            android:enabled="true"
+            android:exported="false"
+            android:foregroundServiceType="specialUse">
+            <property
+                android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
+                android:value="Enforcing continuous app locking schedule and duration restrictions without system termination" />
+        </service>
 
         <!-- Accessibility Service for foreground application monitoring -->
         <service

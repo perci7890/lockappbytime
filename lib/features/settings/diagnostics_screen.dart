@@ -238,6 +238,12 @@ class _DiagnosticsScreenState extends State<DiagnosticsScreen> {
                       ),
                       const Divider(color: Color(0xFF334155), height: 1),
                       _buildDiagnosticRow(
+                        'Persistent Foreground Service',
+                        _diagnostics['isForegroundServiceRunning'] == true ? 'Active (Protected)' : 'Inactive',
+                        _diagnostics['isForegroundServiceRunning'] == true ? Colors.greenAccent : Colors.amberAccent,
+                      ),
+                      const Divider(color: Color(0xFF334155), height: 1),
+                      _buildDiagnosticRow(
                         'Overlay Permission',
                         isOverlayGranted ? 'Granted' : 'Denied',
                         isOverlayGranted ? Colors.greenAccent : Colors.redAccent,

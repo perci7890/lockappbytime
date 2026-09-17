@@ -2,11 +2,11 @@ import 'dart:convert';
 import 'dart:math';
 import 'package:crypto/crypto.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'native_bridge_service.dart';
 
 class PinService {
   static const String _keyPinHash = 'security_pin_hash';
   static const String _keyPinEnabled = 'security_pin_enabled';
-  static const String _keyEmergencyPinRequired = 'pin_required_for_emergency';
   static const String _keyFailedAttempts = 'pin_failed_attempts';
   static const String _keyLockoutUntil = 'pin_lockout_until';
 
@@ -71,16 +71,6 @@ class PinService {
     return prefs.getBool(_keyPinEnabled) ?? false;
   }
 
-  static Future<bool> isEmergencyPinRequired() async {
-    final prefs = await SharedPreferences.getInstance();
-    return prefs.getBool(_keyEmergencyPinRequired) ?? false;
-  }
-
-  static Future<void> setEmergencyPinRequired(bool required) async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setBool(_keyEmergencyPinRequired, required);
-  }
-
   static Future<bool> setPin(String pin) async {
     if (pin.length < 4) return false;
     final prefs = await SharedPreferences.getInstance();
@@ -88,6 +78,7 @@ class PinService {
     final hashRecord = _createPbkdf2Hash(pin, salt);
     await prefs.setString(_keyPinHash, hashRecord);
     await prefs.setBool(_keyPinEnabled, true);
+    await NativeBridgeService.syncPinNative(hashRecord, true);
     return true;
   }
 
@@ -97,6 +88,7 @@ class PinService {
     await prefs.setBool(_keyPinEnabled, false);
     await prefs.remove(_keyFailedAttempts);
     await prefs.remove(_keyLockoutUntil);
+    await NativeBridgeService.syncPinNative('', false);
   }
 
   static Future<PinVerificationResult> verifyPin(String pin) async {

@@ -12,6 +12,7 @@ import android.graphics.drawable.BitmapDrawable
 import android.graphics.drawable.Drawable
 import android.net.Uri
 import android.os.Build
+import android.os.PowerManager
 import android.os.Process
 import android.os.SystemClock
 import android.provider.Settings
@@ -31,6 +32,9 @@ class MainActivity : FlutterActivity() {
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
+
+        // Ensure persistent background protection service is active
+        AppLockForegroundService.start(this)
 
         MethodChannel(flutterEngine.dartExecutor.binaryMessenger, CHANNEL).setMethodCallHandler { call, result ->
             when (call.method) {
@@ -70,19 +74,51 @@ class MainActivity : FlutterActivity() {
                         }
                     }
                 }
-                "setEmergencyUnlock" -> {
-                    val pkg = call.argument<String>("packageName") ?: ""
-                    val duration = call.argument<Number>("durationMillis")?.toLong() ?: (5 * 60 * 1000L)
-                    if (pkg.isNotEmpty()) {
-                        LockStorage.setEmergencyUnlock(this, pkg, duration)
-                        result.success(true)
+                "syncPinNative" -> {
+                    val hash = call.argument<String>("pinHash") ?: ""
+                    val isEnabled = call.argument<Boolean>("isEnabled") ?: false
+                    LockStorage.savePinConfig(this, hash, isEnabled)
+                    result.success(true)
+                }
+                "isBatteryOptimizationIgnored" -> {
+                    val pm = getSystemService(Context.POWER_SERVICE) as? PowerManager
+                    val isIgnored = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                        pm?.isIgnoringBatteryOptimizations(packageName) ?: false
                     } else {
-                        result.error("INVALID_ARGS", "Package name required", null)
+                        true
+                    }
+                    result.success(isIgnored)
+                }
+                "requestIgnoreBatteryOptimization" -> {
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                        try {
+                            val intent = Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS).apply {
+                                data = Uri.parse("package:$packageName")
+                                flags = Intent.FLAG_ACTIVITY_NEW_TASK
+                            }
+                            startActivity(intent)
+                            result.success(true)
+                        } catch (e: Exception) {
+                            try {
+                                val fallbackIntent = Intent(Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS).apply {
+                                    flags = Intent.FLAG_ACTIVITY_NEW_TASK
+                                }
+                                startActivity(fallbackIntent)
+                                result.success(true)
+                            } catch (e2: Exception) {
+                                result.error("BATTERY_OPT_ERROR", e2.message, null)
+                            }
+                        }
+                    } else {
+                        result.success(true)
                     }
                 }
+                "setEmergencyUnlock" -> {
+                    // Deprecated
+                    result.success(false)
+                }
                 "isEmergencyUnlocked" -> {
-                    val pkg = call.argument<String>("packageName") ?: ""
-                    result.success(LockStorage.isEmergencyUnlocked(this, pkg))
+                    result.success(false)
                 }
                 "getInstalledApps" -> {
                     executor.execute {
@@ -163,6 +199,7 @@ class MainActivity : FlutterActivity() {
                     val diagnostics = mapOf(
                         "isAccessibilityActive" to AppLockAccessibilityService.isServiceRunning,
                         "isAccessibilityPermissionGranted" to isAccessibilityServiceEnabled(this),
+                        "isForegroundServiceRunning" to AppLockForegroundService.isServiceRunning,
                         "isOverlayGranted" to (if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) Settings.canDrawOverlays(this) else true),
                         "isUsageAccessGranted" to hasUsageStatsPermission(this),
                         "nativeLocksCount" to LockStorage.getAllLocks(this).size,

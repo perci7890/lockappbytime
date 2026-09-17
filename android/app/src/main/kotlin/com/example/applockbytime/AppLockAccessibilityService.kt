@@ -2,6 +2,7 @@ package com.example.applockbytime
 
 import android.accessibilityservice.AccessibilityService
 import android.content.Intent
+import android.content.pm.PackageManager
 import android.os.SystemClock
 import android.util.Log
 import android.view.accessibility.AccessibilityEvent
@@ -13,28 +14,18 @@ class AppLockAccessibilityService : AccessibilityService() {
         var isServiceRunning = false
             private set
 
-        // Prevent rapid re-triggering loops
         private var lastBlockedPackage: String? = null
-        private var lastBlockedTime: Long = 0
-        private const val BLOCK_DEBOUNCE_MS = 800L
+        private var lastBlockedTime: Long = 0L
 
-        // Whitelist critical system packages that must never be blocked
+        // Whitelist essential Android OS components that must never be blocked
         private val EXCLUDED_PACKAGES = setOf(
             "com.android.systemui",
             "android",
-            "com.android.launcher",
-            "com.android.launcher3",
-            "com.google.android.apps.nexuslauncher",
-            "com.sec.android.app.launcher",
-            "com.miui.home",
-            "com.oppo.launcher",
-            "com.huawei.android.launcher",
-            "com.oneplus.launcher",
-            "com.android.settings",
+            "com.android.inputmethod.latin",
             "com.google.android.inputmethod.latin",
             "com.samsung.android.honeyboard",
-            "com.google.android.packageinstaller",
-            "com.android.permissioncontroller"
+            "com.android.permissioncontroller",
+            "com.google.android.packageinstaller"
         )
     }
 
@@ -42,15 +33,15 @@ class AppLockAccessibilityService : AccessibilityService() {
         super.onServiceConnected()
         isServiceRunning = true
         Log.i(TAG, "AppLockAccessibilityService connected and active.")
+        // Ensure persistent foreground service runs to prevent Android OS termination
+        AppLockForegroundService.start(this)
     }
 
     override fun onAccessibilityEvent(event: AccessibilityEvent?) {
         if (event == null) return
 
         try {
-            if (event.eventType == AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED ||
-                event.eventType == AccessibilityEvent.TYPE_WINDOWS_CHANGED
-            ) {
+            if (event.eventType == AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED) {
                 val packageNameCharSequence = event.packageName ?: return
                 val currentPackage = packageNameCharSequence.toString()
 
@@ -60,12 +51,16 @@ class AppLockAccessibilityService : AccessibilityService() {
                     return
                 }
 
-                // Never intercept excluded system components or launchers
-                if (EXCLUDED_PACKAGES.contains(currentPackage) ||
-                    currentPackage.contains("inputmethod") ||
-                    currentPackage.contains("launcher")
-                ) {
+                // If user is on the launcher / home screen, clear last blocked package immediately
+                if (isLauncherPackage(currentPackage)) {
                     lastBlockedPackage = null
+                    return
+                }
+
+                // Never intercept excluded system components
+                if (EXCLUDED_PACKAGES.contains(currentPackage) ||
+                    currentPackage.contains("inputmethod")
+                ) {
                     return
                 }
 
@@ -79,25 +74,42 @@ class AppLockAccessibilityService : AccessibilityService() {
         }
     }
 
+    private fun isLauncherPackage(pkg: String): Boolean {
+        if (pkg.contains("launcher", ignoreCase = true) || pkg.contains("home", ignoreCase = true)) {
+            return true
+        }
+        try {
+            val intent = Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_HOME)
+            val resolveInfo = packageManager.resolveActivity(intent, PackageManager.MATCH_DEFAULT_ONLY)
+            if (resolveInfo?.activityInfo?.packageName == pkg) {
+                return true
+            }
+        } catch (_: Exception) {}
+        return false
+    }
+
     private fun checkAndEnforceLock(pkg: String) {
         val now = SystemClock.uptimeMillis()
-
-        // Debounce if the same package was just handled within the debounce window
-        if (pkg == lastBlockedPackage && (now - lastBlockedTime) < BLOCK_DEBOUNCE_MS) {
-            return
-        }
 
         // Clean up expired locks periodically on foreground events
         LockStorage.cleanupExpiredLocks(this)
 
         val activeLock = LockStorage.getActiveLock(this, pkg)
         if (activeLock != null && activeLock.isCurrentlyLocked()) {
+            // If the lock screen is already visible for this exact package, do not re-launch
+            if (LockScreenActivity.isLockScreenVisible && pkg == lastBlockedPackage) {
+                return
+            }
+
             lastBlockedPackage = pkg
             lastBlockedTime = now
             LockStorage.recordEnforcementCheck("BLOCKED: $pkg")
             Log.d(TAG, "Blocking locked package: $pkg until ${activeLock.unlockAt}")
             showLockScreen(activeLock)
         } else {
+            if (pkg == lastBlockedPackage) {
+                lastBlockedPackage = null
+            }
             LockStorage.recordEnforcementCheck("ALLOWED: $pkg")
         }
     }
@@ -116,6 +128,8 @@ class AppLockAccessibilityService : AccessibilityService() {
             startActivity(intent)
         } catch (e: Exception) {
             LockStorage.recordError("Failed to launch LockScreenActivity: ${e.message}")
+            // Strict enforcement fallback: kick user back to home immediately if activity start blocked
+            performGlobalAction(GLOBAL_ACTION_HOME)
         }
     }
 

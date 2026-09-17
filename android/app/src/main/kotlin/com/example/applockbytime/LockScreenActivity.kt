@@ -1,12 +1,22 @@
 package com.example.applockbytime
 
 import android.app.AlertDialog
+import android.content.Context
 import android.content.Intent
+import android.graphics.Color
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
+import android.text.InputFilter
+import android.text.InputType
+import android.text.method.PasswordTransformationMethod
+import android.view.Gravity
+import android.view.inputmethod.InputMethodManager
 import android.widget.Button
+import android.widget.EditText
+import android.widget.FrameLayout
 import android.widget.TextView
+import android.widget.Toast
 import androidx.activity.ComponentActivity
 import java.text.SimpleDateFormat
 import java.util.Calendar
@@ -15,10 +25,15 @@ import java.util.Locale
 
 class LockScreenActivity : ComponentActivity() {
 
+    companion object {
+        var isLockScreenVisible: Boolean = false
+            private set
+    }
+
     private lateinit var tvAppName: TextView
     private lateinit var tvCountdown: TextView
     private lateinit var tvUnlockAt: TextView
-    private lateinit var btnEmergencyUnlock: Button
+    private lateinit var btnUnlockWithPin: Button
     private lateinit var btnGoBack: Button
 
     private var targetPackage: String = ""
@@ -40,7 +55,7 @@ class LockScreenActivity : ComponentActivity() {
         tvAppName = findViewById(R.id.tvAppName)
         tvCountdown = findViewById(R.id.tvCountdown)
         tvUnlockAt = findViewById(R.id.tvUnlockAt)
-        btnEmergencyUnlock = findViewById(R.id.btnEmergencyUnlock)
+        btnUnlockWithPin = findViewById(R.id.btnUnlockWithPin)
         btnGoBack = findViewById(R.id.btnGoBack)
 
         extractIntentData(intent)
@@ -49,8 +64,8 @@ class LockScreenActivity : ComponentActivity() {
             goHome()
         }
 
-        btnEmergencyUnlock.setOnClickListener {
-            showEmergencyConfirmDialog()
+        btnUnlockWithPin.setOnClickListener {
+            showUnlockWithPinDialog()
         }
     }
 
@@ -99,28 +114,99 @@ class LockScreenActivity : ComponentActivity() {
         updateTimer()
     }
 
-    private fun showEmergencyConfirmDialog() {
-        AlertDialog.Builder(this)
-            .setTitle("Emergency Unlock")
-            .setMessage("$appName will be temporarily accessible for 5 minutes.\n\nAfter 5 minutes, normal locking will automatically resume.")
-            .setPositiveButton("Unlock for 5 Min") { _, _ ->
-                if (targetPackage.isNotEmpty()) {
-                    LockStorage.setEmergencyUnlock(this, targetPackage, 5 * 60 * 1000L)
+    private fun showUnlockWithPinDialog() {
+        val isPinConfigured = LockStorage.isPinEnabled(this)
+        if (!isPinConfigured) {
+            // No security PIN configured yet
+            AlertDialog.Builder(this)
+                .setTitle("Unlock $appName")
+                .setMessage("No Security PIN is configured in App Locker.\n\nDo you want to cancel the remaining lock time and unlock $appName?")
+                .setPositiveButton("Unlock App") { _, _ ->
+                    performUnlock()
                 }
-                finish()
-            }
+                .setNegativeButton("Cancel", null)
+                .show()
+            return
+        }
+
+        // Security PIN is active: require PIN entry
+        val input = EditText(this).apply {
+            inputType = InputType.TYPE_CLASS_NUMBER or InputType.TYPE_NUMBER_VARIATION_PASSWORD
+            transformationMethod = PasswordTransformationMethod.getInstance()
+            filters = arrayOf(InputFilter.LengthFilter(8))
+            gravity = Gravity.CENTER
+            textSize = 22f
+            setTextColor(Color.WHITE)
+            setHintTextColor(Color.parseColor("#64748B"))
+            hint = "Enter PIN"
+            setPadding(32, 24, 32, 24)
+            setBackgroundColor(Color.parseColor("#0F172A"))
+        }
+
+        val container = FrameLayout(this).apply {
+            setPadding(50, 30, 50, 20)
+            addView(input)
+        }
+
+        val dialog = AlertDialog.Builder(this)
+            .setTitle("Security PIN Verification")
+            .setMessage("Enter your PIN to remove the remaining lock time for $appName:")
+            .setView(container)
+            .setPositiveButton("Unlock", null)
             .setNegativeButton("Cancel", null)
-            .show()
+            .create()
+
+        dialog.setOnShowListener {
+            val unlockBtn = dialog.getButton(AlertDialog.BUTTON_POSITIVE)
+            unlockBtn.setOnClickListener {
+                val enteredPin = input.text.toString().trim()
+                if (enteredPin.isEmpty()) {
+                    input.error = "Please enter PIN"
+                    return@setOnClickListener
+                }
+
+                val isCorrect = LockStorage.verifyPinNative(this, enteredPin)
+                if (isCorrect) {
+                    dialog.dismiss()
+                    performUnlock()
+                } else {
+                    input.error = "Incorrect PIN"
+                    input.setText("")
+                }
+            }
+
+            input.requestFocus()
+            val imm = getSystemService(Context.INPUT_METHOD_SERVICE) as? InputMethodManager
+            imm?.showSoftInput(input, InputMethodManager.SHOW_IMPLICIT)
+        }
+
+        dialog.show()
+    }
+
+    private fun performUnlock() {
+        if (targetPackage.isNotEmpty()) {
+            LockStorage.removeLock(this, targetPackage)
+            Toast.makeText(this, "$appName unlocked", Toast.LENGTH_SHORT).show()
+        }
+        finish()
     }
 
     override fun onResume() {
         super.onResume()
+        isLockScreenVisible = true
         handler.removeCallbacks(updateRunnable)
         handler.post(updateRunnable)
     }
 
     override fun onPause() {
         super.onPause()
+        isLockScreenVisible = false
+        handler.removeCallbacks(updateRunnable)
+    }
+
+    override fun onDestroy() {
+        super.onDestroy()
+        isLockScreenVisible = false
         handler.removeCallbacks(updateRunnable)
     }
 
@@ -128,7 +214,7 @@ class LockScreenActivity : ComponentActivity() {
         if (targetPackage.isNotEmpty()) {
             val activeLock = LockStorage.getActiveLock(this, targetPackage)
             if (activeLock == null) {
-                // Lock expired or lifted (e.g., via emergency unlock or schedule window ending)
+                // Lock removed or expired
                 handler.removeCallbacks(updateRunnable)
                 finish()
                 return
@@ -162,10 +248,11 @@ class LockScreenActivity : ComponentActivity() {
     private fun goHome() {
         val homeIntent = Intent(Intent.ACTION_MAIN).apply {
             addCategory(Intent.CATEGORY_HOME)
-            flags = Intent.FLAG_ACTIVITY_NEW_TASK
+            flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_RESET_TASK_IF_NEEDED
         }
         startActivity(homeIntent)
         finish()
+        overridePendingTransition(0, 0)
     }
 
     @Deprecated("Deprecated in Java")

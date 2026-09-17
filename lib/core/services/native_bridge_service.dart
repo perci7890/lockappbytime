@@ -83,12 +83,12 @@ class NativeBridgeService {
     }
   }
 
-  /// Set 5-minute emergency unlock natively
-  static Future<bool> setEmergencyUnlock(String packageName, {int durationMillis = 300000}) async {
+  /// Sync PIN hash and enabled status to Native Android storage
+  static Future<bool> syncPinNative(String pinHash, bool isEnabled) async {
     try {
-      final bool? result = await _channel.invokeMethod<bool>('setEmergencyUnlock', {
-        'packageName': packageName,
-        'durationMillis': durationMillis,
+      final bool? result = await _channel.invokeMethod<bool>('syncPinNative', {
+        'pinHash': pinHash,
+        'isEnabled': isEnabled,
       });
       return result ?? false;
     } on PlatformException {
@@ -96,13 +96,20 @@ class NativeBridgeService {
     }
   }
 
-  /// Check emergency unlock status
-  static Future<bool> isEmergencyUnlocked(String packageName) async {
+  /// Check if Battery Optimization is ignored for this app
+  static Future<bool> isBatteryOptimizationIgnored() async {
     try {
-      final bool? result = await _channel.invokeMethod<bool>(
-        'isEmergencyUnlocked',
-        {'packageName': packageName},
-      );
+      final bool? result = await _channel.invokeMethod<bool>('isBatteryOptimizationIgnored');
+      return result ?? false;
+    } on PlatformException {
+      return true;
+    }
+  }
+
+  /// Request user to disable battery optimization
+  static Future<bool> requestIgnoreBatteryOptimization() async {
+    try {
+      final bool? result = await _channel.invokeMethod<bool>('requestIgnoreBatteryOptimization');
       return result ?? false;
     } on PlatformException {
       return false;

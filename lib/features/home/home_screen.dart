@@ -132,6 +132,58 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                     onEnablePressed: () => provider.openAccessibilitySettings(),
                   ),
 
+                if (!provider.isBatteryOptimizationIgnored)
+                  Container(
+                    margin: const EdgeInsets.only(bottom: 20),
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF422006),
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(color: const Color(0xFFF59E0B).withValues(alpha: 0.6)),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Row(
+                          children: [
+                            Icon(Icons.battery_alert, color: Color(0xFFFBBF24)),
+                            SizedBox(width: 8),
+                            Expanded(
+                              child: Text(
+                                'Battery Optimization Enabled',
+                                style: TextStyle(
+                                  color: Color(0xFFFDE68A),
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 15,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 6),
+                        const Text(
+                          'Android may kill App Locker in the background, causing accessibility to turn off. Set battery usage to "Unrestricted" for 100% strict enforcement.',
+                          style: TextStyle(color: Colors.white70, fontSize: 13, height: 1.4),
+                        ),
+                        const SizedBox(height: 12),
+                        Align(
+                          alignment: Alignment.centerRight,
+                          child: ElevatedButton.icon(
+                            onPressed: () => provider.requestIgnoreBatteryOptimization(),
+                            icon: const Icon(Icons.flash_on, size: 16),
+                            label: const Text('Set Unrestricted'),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: const Color(0xFFD97706),
+                              foregroundColor: Colors.white,
+                              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                              textStyle: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+
                 // ACTIVE NOW Header
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -191,23 +243,6 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                     return ActiveLockCard(
                       key: ValueKey('${lock.packageName}_${lock.lockType}_${lock.sourceId}'),
                       lock: lock,
-                      onEmergencyUnlock: () async {
-                        final emergencyPinReq = await PinService.isEmergencyPinRequired();
-                        if (emergencyPinReq) {
-                          final verified = await _verifyPinIfRequired();
-                          if (!verified) return;
-                        }
-
-                        await provider.triggerEmergencyUnlock(lock.packageName);
-                        if (context.mounted) {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(
-                              content: Text('⚡ ${lock.appName} unlocked for 5 minutes!'),
-                              backgroundColor: const Color(0xFFF59E0B),
-                            ),
-                          );
-                        }
-                      },
                       onUnlockEarly: () async {
                         final verified = await _verifyPinIfRequired();
                         if (!verified) return;

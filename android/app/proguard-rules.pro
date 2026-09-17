@@ -8,6 +8,7 @@
 
 # App Locker Native Enforcement components
 -keep class com.example.applockbytime.AppLockAccessibilityService { *; }
+-keep class com.example.applockbytime.AppLockForegroundService { *; }
 -keep class com.example.applockbytime.LockScreenActivity { *; }
 -keep class com.example.applockbytime.MainActivity { *; }
 -keep class com.example.applockbytime.BootReceiver { *; }

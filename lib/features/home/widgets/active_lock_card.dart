@@ -6,13 +6,11 @@ import '../../apps/widgets/app_icon_widget.dart';
 class ActiveLockCard extends StatelessWidget {
   final LockRecord lock;
   final VoidCallback onUnlockEarly;
-  final VoidCallback? onEmergencyUnlock;
 
   const ActiveLockCard({
     super.key,
     required this.lock,
     required this.onUnlockEarly,
-    this.onEmergencyUnlock,
   });
 
   String _formatRemaining(Duration duration) {
@@ -142,14 +140,6 @@ class ActiveLockCard extends StatelessWidget {
                 ),
                 Row(
                   children: [
-                    if (onEmergencyUnlock != null) ...[
-                      IconButton(
-                        tooltip: '5-Minute Emergency Unlock',
-                        onPressed: onEmergencyUnlock,
-                        icon: const Icon(Icons.flash_on, color: Color(0xFFF59E0B), size: 20),
-                      ),
-                      const SizedBox(width: 6),
-                    ],
                     OutlinedButton.icon(
                       onPressed: onUnlockEarly,
                       icon: const Icon(Icons.lock_open, size: 16),

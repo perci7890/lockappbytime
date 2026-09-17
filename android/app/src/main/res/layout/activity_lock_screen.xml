@@ -76,14 +76,14 @@
             android:textColor="#64748B"
             android:textSize="14sp" />
 
-        <!-- Emergency 5 min Button -->
+        <!-- Unlock with PIN Button -->
         <Button
-            android:id="@+id/btnEmergencyUnlock"
+            android:id="@+id/btnUnlockWithPin"
             android:layout_width="match_parent"
             android:layout_height="48dp"
             android:layout_marginTop="24dp"
-            android:backgroundTint="#F59E0B"
-            android:text="⚡ Emergency 5 min"
+            android:backgroundTint="#334155"
+            android:text="🔓 Unlock with PIN"
             android:textAllCaps="false"
             android:textColor="#FFFFFF"
             android:textSize="15sp"
@@ -96,7 +96,7 @@
             android:layout_height="48dp"
             android:layout_marginTop="12dp"
             android:backgroundTint="#2563EB"
-            android:text="Go Back"
+            android:text="Exit to Home"
             android:textAllCaps="false"
             android:textColor="#FFFFFF"
             android:textSize="15sp" />
