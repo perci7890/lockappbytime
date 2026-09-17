@@ -1,4 +1,4 @@
-﻿# Flutter ProGuard Rules
+# Flutter ProGuard Rules
 -keep class io.flutter.app.** { *; }
 -keep class io.flutter.plugin.**  { *; }
 -keep class io.flutter.util.**  { *; }
@@ -14,3 +14,6 @@
 -keep class com.example.applockbytime.PackageChangeReceiver { *; }
 -keep class com.example.applockbytime.LockStorage { *; }
 -keep class com.example.applockbytime.LockInfo { *; }
+
+# Flutter deferred components / Google Play Core
+-dontwarn com.google.android.play.core.**
